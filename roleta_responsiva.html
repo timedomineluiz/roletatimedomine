@@ -1,0 +1,218 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Roleta Time Domine</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/2.1.3/TweenMax.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/zarocknz/javascript-winwheel@2.7.0/Winwheel.min.js"></script>
+  <style>
+    body {
+      background-color: transparent;
+      font-family: 'Montserrat', sans-serif;
+      text-align: center;
+      padding-top: 40px;
+      margin: 0;
+    }
+
+    #wheel-container {
+      position: relative;
+      display: inline-block;
+      width: 100%;
+      max-width: 600px;
+    }
+
+    #canvas {
+      background-color: transparent;
+      border-radius: 50%;
+      width: 100%;
+      height: auto;
+    }
+
+    #pointer {
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 20px solid transparent;
+      border-right: 20px solid transparent;
+      border-top: 30px solid #ffcc00;
+      z-index: 10;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 12px 30px;
+      font-size: 18px;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: bold;
+      background-color: #ffcc00;
+      color: #1c1c1c;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #ffd633;
+      transform: translateY(-2px);
+    }
+
+    #redeem-btn {
+      display: none;
+    }
+
+    #result-text {
+      margin-top: 20px;
+      font-size: 22px;
+      font-weight: bold;
+      color: #ffffff;
+      white-space: pre-line;
+    }
+
+    #timer {
+      margin-top: 10px;
+      font-size: 18px;
+      color: #ffcc00;
+      font-weight: bold;
+    }
+
+    @media (max-width: 768px) {
+      #wheel-container {
+        max-width: 90%;
+      }
+
+      button {
+        width: 90%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="wheel-container">
+    <div id="pointer"></div>
+    <canvas id="canvas" width="1000" height="1000"></canvas>
+  </div>
+  <div id="result-text"></div>
+  <div id="timer"></div>
+  <button id="spin-btn">Girar a Roleta</button>
+  <button id="redeem-btn">Resgatar Cupom</button>
+
+  <script>
+    const spinBtn = document.getElementById('spin-btn');
+    const redeemBtn = document.getElementById('redeem-btn');
+    const canvas = document.getElementById('canvas');
+    const pointer = document.getElementById('pointer');
+    const resultText = document.getElementById('result-text');
+    const timer = document.getElementById('timer');
+    let currentPrize = '';
+
+    function generateCouponCode(prize) {
+      const clean = prize.replace("\nde desconto", "").trim();
+      const now = new Date();
+      const date = now.toISOString().slice(0, 10).replace(/-/g, '');
+      const hour = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+      const secret = 'DOMINE2025';
+      const raw = `${clean}|${date}|${hour}|${secret}`;
+      const base64 = btoa(raw);
+      return `#${base64}`;
+    }
+
+    function startCountdown(expirationTime) {
+      const interval = setInterval(() => {
+        const now = new Date().getTime();
+        const distance = expirationTime - now;
+        if (distance < 0) {
+          clearInterval(interval);
+          timer.innerText = "Cupom expirado.";
+        } else {
+          const totalHours = Math.floor(distance / (1000 * 60 * 60));
+          const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+          timer.innerText = `⏳ Validade do cupom: ${totalHours}h ${minutes}m ${seconds}s`;
+        }
+      }, 1000);
+    }
+
+    function showFinalState(prize) {
+      currentPrize = prize;
+      const expiration = new Date().getTime() + 48 * 60 * 60 * 1000;
+      localStorage.setItem('roleta_expiration_time', expiration);
+      localStorage.setItem('roleta_time_domine', prize);
+      resultText.innerText = `🎉 Você ganhou: ${prize}\n⚠️ Este cupom é válido por 48 horas a partir de agora!`;
+      redeemBtn.style.display = 'inline-block';
+      spinBtn.style.display = 'none';
+      startCountdown(expiration);
+    }
+
+    const storedPrize = localStorage.getItem('roleta_time_domine');
+    const storedExpiration = localStorage.getItem('roleta_expiration_time');
+    if (storedPrize && storedExpiration) {
+      currentPrize = storedPrize;
+      resultText.innerText = `🎉 Você ganhou: ${storedPrize}\n⚠️ Este cupom é válido por 48 horas a partir de agora!`;
+      redeemBtn.style.display = 'inline-block';
+      spinBtn.style.display = 'none';
+      startCountdown(parseInt(storedExpiration));
+      canvas.style.display = 'none';
+      pointer.style.display = 'none';
+    } else {
+      let wheel = new Winwheel({
+        'canvasId': 'canvas',
+        'numSegments': 10,
+        'outerRadius': 280,
+        'textFontSize': 24,
+        'textFontFamily': 'Montserrat',
+        'textFillStyle': '#ffffff',
+        'textAlignment': 'center',
+        'textOrientation': 'horizontal',
+        'segments': [
+          { 'fillStyle': '#30AEF0', 'text': '40%\nde desconto' },
+          { 'fillStyle': '#F0C430', 'text': '35%\nde desconto' },
+          { 'fillStyle': '#30F0CB', 'text': '30%\nde desconto' },
+          { 'fillStyle': '#F09C30', 'text': '45%\nde desconto' },
+          { 'fillStyle': '#53819B', 'text': '25%\nde desconto' },
+          { 'fillStyle': '#30AEF0', 'text': '40%\nde desconto' },
+          { 'fillStyle': '#F0C430', 'text': '35%\nde desconto' },
+          { 'fillStyle': '#30F0CB', 'text': '30%\nde desconto' },
+          { 'fillStyle': '#CCCCCC', 'text': '60%\nde desconto' },
+          { 'fillStyle': '#999999', 'text': '80%\nde desconto' }
+        ],
+        'animation': {
+          'type': 'spinToStop',
+          'duration': 10,
+          'spins': 12,
+          'callbackFinished': alertPrize
+        }
+      });
+
+      spinBtn.addEventListener('click', function () {
+        wheel.startAnimation();
+        redeemBtn.style.display = 'none';
+        resultText.innerText = '';
+        timer.innerText = '';
+      });
+
+      function alertPrize(indicatedSegment) {
+        const prize = indicatedSegment.text;
+        showFinalState(prize);
+      }
+    }
+
+    redeemBtn.addEventListener('click', function () {
+      if (currentPrize) {
+        const cleanPrize = currentPrize.replace("\nde desconto", "").trim();
+        const code = generateCouponCode(currentPrize);
+        const message = `Olá, ganhei o cupom de ${cleanPrize} de desconto! Gostaria de resgatar! Código: ${code}`;
+        const encodedMessage = encodeURIComponent(message);
+        const link = `https://api.whatsapp.com/send?phone=554691299432&text=${encodedMessage}`;
+        window.location.href = link;
+      }
+    });
+  </script>
+</body>
+</html>
